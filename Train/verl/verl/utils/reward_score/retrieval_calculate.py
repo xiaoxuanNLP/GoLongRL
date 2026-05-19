@@ -1,0 +1,104 @@
+# Copyright 2024 Bytedance Ltd. and/or its affiliates
+# Copyright 2022 EleutherAI and the HuggingFace Inc. team. All rights reserved.
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# Adapted from https://github.com/EleutherAI/lm-evaluation-harness/blob/main/lm_eval/tasks/hendrycks_math/utils.py
+
+import re
+import signal
+from typing import Optional
+from .math_dapo import compute_score as math_dapo_compute_score
+
+def extract_sft_content(text):
+    doc_ids = []
+    doc_ids_match = re.search(r'<relevant_doc_ids>(.*?)</relevant_doc_ids>', text, re.DOTALL)
+    if doc_ids_match:
+        doc_ids_text = doc_ids_match.group(1)
+        # 提取所有<|doc_数字|>格式的内容
+        doc_ids = re.findall(r'<\|doc_\d+\|>', doc_ids_text)
+    
+    # 提取summary内容
+    summary = ""
+    summary_match = re.search(r'<summary>(.*?)</summary>', text, re.DOTALL)
+    if summary_match:
+        summary = summary_match.group(1).strip()
+    
+    # 提取continue_reasoning内容
+    continue_reasoning = ""
+    reasoning_match = re.search(r'<continue_reasoning>(.*?)</continue_reasoning>', text, re.DOTALL)
+    if reasoning_match:
+        continue_reasoning = reasoning_match.group(1).strip()
+    
+    return {
+        "doc_ids": doc_ids,
+        "summary": summary,
+        "continue_reasoning": continue_reasoning
+    }
+
+def jaccard_similarity(set_A, set_B):
+    set_a = set(set_A)
+    set_b = set(set_B)
+    
+    # 计算交集和并集
+    intersection = set_a.intersection(set_b)
+    union = set_a.union(set_b)
+    
+    # 处理并集为空的情况（两个list都为空）
+    if len(union) == 0:
+        return 1.0  # 两个空集合认为完全相似
+    
+    # 计算Jaccard相似度 = |A ∩ B| / |A ∪ B|
+    return len(intersection) / len(union)
+
+def set_equ(set_A, set_B):
+    set_a = set(set_A)
+    set_b = set(set_B)
+    return set_a == set_b
+
+def compute_score(
+    solution_str: str,
+    ground_truth
+) -> float:
+    # ground_truth = ground_truth[-1] # TODO
+    # print("ground_truth = ",ground_truth) # TODO
+    extract = extract_sft_content(solution_str)
+    if not extract["doc_ids"] or not extract["continue_reasoning"]:
+        return 0.0
+    
+    doc_ids_label = ground_truth["doc_ids"]
+    doc_ids_resp = extract["doc_ids"]
+    # print("doc_ids_label = ",doc_ids_label)
+    # print("doc_ids_resp = ",doc_ids_resp)
+    # print("extract[continue_reasoning] = ",extract["continue_reasoning"])
+    # print("ground_truth[golden_label] = ",ground_truth["golden_label"])
+
+    # retrival_score = jaccard_similarity(doc_ids_label, doc_ids_resp) # ori
+    retrival_score = set_equ(doc_ids_label, doc_ids_resp) # hard reward
+    cal_score = math_dapo_compute_score(extract["continue_reasoning"], ground_truth["golden_label"], is_use_math_verify=True)
+
+    # return retrival_score * 1/3 + cal_score * 2/3 # ori
+    if retrival_score is True and cal_score > 0:
+        return 1.0
+    else:
+        return 0.0
+
+    
+# if __name__ == "__main__":
+#     a = jaccard_similarity(["asd","dsa","qwe","ewq"],["asd","dsa","qwe","ewq","asd","dsa","qwe","ewq"])
+#     print(a)
+
+
+# if __name__ == "__main__":
+#     text = "<think>\n<relevant_doc_ids><|doc_147|>, <|doc_978|>, <|doc_389|>, <|doc_965|>, <|doc_300|>, <|doc_508|>, <|doc_235|>, <|doc_224|>, <|doc_482|>, <|doc_119|>, <|doc_504|>, <|doc_397|></relevant_doc_ids>\nThe current reasoning addresses both parts of the problem. For part (1), the approach uses the condition for tangency: the distance from the circle's center (0,0) to the line \\(ax + by + 5 = 0\\) must equal the radius (1). This simplifies to \\(a^2 + b^2 = 25\\). Since \\(a\\) and \\(b\\) are die outcomes (integers 1–6), the pairs satisfying this are (3,4) and (4,3), giving 2 favorable outcomes. For part (2), the approach identifies cases where segments \\(a\\), \\(b\\), and 5 form an isosceles triangle: \\(a = b \\geq 3\\), \\(a = 5\\) with \\(b \\neq 5\\), or \\(b = 5\\) with \\(a \\neq 5\\). This yields 4 + 5 + 5 = 14 favorable pairs after verifying triangle inequalities. The total outcomes are 36 for both parts. The current state has complete solutions: part (1) probability is \\(1/18\\), and part (2) is \\(7/18\\).</summary>\n<continue_reasoning>It fails if a+b ≤5 or a ≥ b+5 or b ≥ a+5.\nBut b ≥ a+5: since a≥1, b≤6, so b≥a+5 ≥1+5=6, so b≥6 and a≤b-5≤6-5=1, so b=6, a≤1.\nSimilarly, a≥b+5 implies a=6, b≤1.\nAnd a+b≤5.\nNow, these might overlap, but let's list all pairs where triangle inequality fails.\nFirst, a+b≤5.\nPossible pairs:\n\na=1,b=1:1+1=2<5?\n2<5 but not greater, so fail.\nActually, a+b=2<5, so a+b not greater than 5.\nThe inequality is a+b >5, so if a+b ≤5, fails.\nSimilarly, a+b<5 or =5?\nBut for degenerate, a+b=5 might be degenerate.\nIn triangle inequality, for non-degenerate, we need strict inequality: sum of any two sides greater than the third.\nSo if a+b=5, and the third side is 5, then a+b=5 not greater than 5, so degenerate, not a proper triangle.\nSo we need strict inequality.\nSo a+b >5 must hold strictly.\nSimilarly for others.\nSo for a+b≤5: possible (a,b):\n\na=1,b=1: sum=2≤5\n\na=1,b=2:3≤5\n\na=1,b=3:4≤5\n\na=1,b=4:5≤5?\nbut 5 not greater than 5, so should be excluded.\na=1,b=5:6>5, good.\nList:\n\na=1,b=1: sum=2<5\n\na=1,b=2:3<5\n\na=1,b=3:4<5\n\na=1,b=4:5=5 not greater\n\na=1,b=5:6>5\n\na=1,b=6:7>5\n\nSimilarly, a=2,b=1:3<5\n\na=2,b=2:4<5\n\na=2,b=3:5=5 not greater\n\na=2,b=4:6>5\n\netc. So pairs where a+b ≤5:\n\nSpecifically, a+b <5 or a+b=5.\na+b<5: min is 1+1=2, max?\nwhen a=1,b=3:4<5; a=1,b=4:5 not less; so a+b≤4?\nBut a+b=5 also fails.\nSo pairs:\n\n- Both small: a=1,b=1,2,3?\na+b=1+1=2,1+2=3,1+3=4 all <5\n\na=2,b=1,2: 2+1=3,2+2=4<5\n\na=3,b=1,2:3+1=4<5?\nbut a+b=4<5\n\na=3,b=1:4<5, yes.\na=3,b=2:5?\n3+2=5 not greater.\na=4,b=1:5 not greater.\nAlso, when a+b=5: (1,4),(2,3),(3,2),(4,1)\n\nAnd when a+b<5: (1,1),(1,2),(1,3),(2,1),(2,2),(3,1)\n\nList:\n\n(1,1):2<5\n\n(1,2):3<5\n\n(1,3):4<5\n\n(2,1):3<5\n\n(2,2):4<5\n\n(3,1):4<5\n\nNow, (1,4):5=5\n\n(2,3):5=5\n\n(3,2):5=5\n\n(4,1):5=5\n\nNow, also, when b≥a+5 or a≥b+5.\nb≥a+5: as above, only possible if b=6, a≤1, so (a,b)=(1,6)\n\nSimilarly, a≥b+5: a=6,b≤1, so (6,1)\n\nNow, for (1,6): a+b=1+6=7>5, but a+5=1+5=6 not greater than b=6?\n6>6 false.\nSimilarly, b+5=11>a=1 true, but since one fails, triangle inequality fails.\nSimilarly for (6,1).\nNow, are these included in a+b≤5? (1,6):7>5, not.\nSo we have additional pairs.\nSimilarly, (6,1).\nNow, also, is there overlap?\nFor example, (1,1) is in a+b≤5, but not in this.\nSo total pairs where triangle inequality fails:\n\n1.\na+b≤5: the pairs listed: (1,1),(1,2),(1,3),(2,1),(2,2),(3,1),(1,4),(2,3),(3,2),(4,1)\n\n(1,4) sum=5, (2,3) sum=5, etc.\nAnd also (1,6),(6,1)\n\nBut (1,6) and (6,1) not in the above list.\nNow, are there more?\nFor example, (3,1) sum=4<5, included.\nNow, what about (5,1)?\na+b=6>5, and a+5=10>1, b+5=6>5?\n6>5 true, so it satisfies, as we saw.\nNow, so total failing: the list: (1,1),(1,2),(1,3),(1,4),(2,1),(2,2),(2,3),(3,1),(3,2),(4,1), and (1,6),(6,1)\n\nThat's 11 pairs?\nLet me count.\nFrom a+b≤5: (1,1),(1,2),(1,3),(1,4),(2,1),(2,2),(2,3),(3,1),(3,2),(4,1) — that's 10 pairs.\n(1,4) is included, sum=5.\nBut (1,5)?\nsum=6>5, not included.\nNow, additional (1,6) and (6,1), so total 12 pairs?\nBut (3,3)?\nsum=6>5, should be good.\nList explicitly. Pairs where a+b≤5:\n\n- a=1: b=1,2,3,4 (since 1+4=5≤5)\n\n- a=2: b=1,2,3 (2+3=5≤5)\n\n- a=3: b=1,2 (3+1=4<5, 3+2=5≤5)\n\n- a=4: b=1 (4+1=5≤5)\n\n- a=5: min b=1,5+1=6>5, so no\n\nSimilarly a=6, no.\nBut when a=1,b=4: sum=5\n\na=2,b=3: sum=5\n\na=3,b=2: sum=5\n\na=4,b=1: sum=5\n\na=3,b=1: sum=4<5\n\netc.\nNow, also, when a=1,b=6: sum=7>5, but a+5=6 not greater than b=6.\nSimilarly, a=6,b=1: same.\nNow, are there any others?\nFor example, a=2,b=4: sum=6>5, and a+5=7>4, b+5=9>2, good.\na=4,b=2: same.\na=1,b=5: sum=6>5, a+5=6>5?\n6>5 true, b+5=10>1, good.\nBut for a=1,b=6: sum=7>5, but a+5=1+5=6, b=6, 6>6?\nFalse, so fails.\nSimilarly, only when b=6 and a=1, or symmetrically.\nNow, is there a=2,b=6?\nsum=8>5, a+5=7>6?\n7>6 true, b+5=11>2 true, so should be good.\nSimilarly, only (1,6) and (6,1) are the additional ones.\nNow, so total pairs where triangle inequality fails: \n\nThe list: for each, \n\n(1,1),(1,2),(1,3),(1,4),(1,6) — a=1, b=1,2,3,4,6?\nBut b=5 is good, as above. a=1: when b=1,2,3,4: a+b≤5?\n1+1=2,1+2=3,1+3=4,1+4=5 all ≤5.\nb=5:1+5=6>5, and a+5=6>5?\n6>5 true, so good.\nb=6:1+6=7>5, but a+5=6 not > b=6, so fails.\nSimilarly for a=2: b=1,2,3: 2+1=3<5,2+2=4<5,2+3=5 not greater.\nb=4:2+4=6>5, a+5=7>4?\nyes, so good.\nSimilarly, a=3: b=1,2:3+1=4<5,3+2=5 not greater.\nb=3:3+3=6>5, good.\na=4: b=1:4+1=5 not greater.\nb=2:4+2=6>5, good.\na=5: all b, as long as not failing other, but a+5=10>b always, b+5>a?\nmin b=1,1+5=6>5?\nyes, and a+b≥5+1=6>5, so all good.\na=6: b=1:6+1=7>5, but b+5=1+5=6 not > a=6?\n6>6 false, so fails.\nb=2:6+2=8>5, b+5=7>6?\nyes, a+5=11>2, so good.\nSimilarly, so for a=6, only b=1 fails?\nWhen b=1, a+5=11>1, b+5=6 not > a=6?\n6>6 false.\nb=2:7>6?\n7>6 true.\nSo only when b=1.\nSymmetrically, b=6,a=1 fails. Now, so total failing pairs:\n\nList:\n\n(1,1),(1,2),(1,3),(1,4),(1,6)\n\n(2,1),(2,2),(2,3)\n\n(3,1),(3,2)\n\n(4,1)\n\n(6,1)\n\nAnd (1,6) is already in first list?\nWhen a=1,b=6.\nBut (6,1) is separate.\nSo:\n\n- For a=1: b=1,2,3,4,6 → five pairs: (1,1),(1,2),(1,3),(1,4),(1,6)\n\n- For a=2: b=1,2,3 → three pairs: (2,1),(2,2),(2,3)\n\n- For a=3: b=1,2 → two pairs: (3,1),(3,2)\n\n- For a=4: b=1 → one pair: (4,1)\n\n- For a=5: no failing\n\n- For a=6: b=1 → one pair: (6,1)\n\nBut (1,6) is when a=1,b=6, already included.\nNow, is (6,1) included?\nYes, in a=6,b=1.\nNow, total: a=1:5, a=2:3, a=3:2, a=4:1, a=6:1, sum 5+3+2+1+1=12.\nBut earlier I thought a=1 has five, but (1,5) is not failing, so yes.\nTotal pairs: 6x6=36.\nSo number that satisfy triangle inequality: 36 - 12 = 24.\nBut we don't need that for now.\nNow, among these, how many are isosceles.\nIn our favorable, we have 14 pairs that are isosceles and satisfy triangle inequality.\nBut since in all our favorable pairs, we ensured triangle inequality is satisfied, as we checked.\nTotal isosceles with triangle: 14.\nTotal possible with triangle: 24, but we don't care.\nNow, but to confirm, let's see if there are any isosceles pairs that we missed but satisfy triangle. For example, is there a pair where a=b, but we have only a=b≥3, but if a=b=2, but it doesn't satisfy triangle, so correctly excluded.\nOr if a=5, b=5, included.\nNow, what if a and b different, but say b= a, no.\nOr if a=5, b= something else, we have.\nBut is there a pair where neither a nor b is 5, but a=b, which is included.\nBut what if the equal sides are not a and b, but for example, if a=5 and b= something, but we covered.\nAnother thing: could it be that a and 5 are equal, but we have that when a=5, regardless of b, but in that case, when a=5, the sides are 5,b,5, so sides are 5,b,5, so the two sides equal are the first and the third, which are both 5.\nSimilarly, if b=5, then sides a,5,5, so the second and third are equal.\nIf a=b, then first and second equal.\nSo all cases covered.\nNow, for example, if a=5 and b=5, then all three equal, but still isosceles.\nSo I think we have all.\nNow, total 14 favorable for part (2).\nNow, back to part (1), we have only two pairs: (3,4),(4,3).\nNow, for part (2), we have these pairs, but (3,4) is not isosceles, as we said, sides 3,4,5 scalene.\nNow, so both parts are separate.\nNow, so for part (1), probability is \\frac{2}{36} = \\frac{1}{18}\n\nFor part (2), \\frac{14}{36} = \\frac{7}{18}\n\nNow, the problem says \"find the probability\" for each, so probably present both.\nNow, to box the answer.\nBut perhaps write them clearly.\nSo for (1): \\frac{1}{18}\n\nFor (2): \\frac{7}{18}\n\nNow, but let me confirm if in part (1), we need to consider something else.\nIn part (1), we assumed that the distance is exactly equal to radius for tangency, which is correct. And we got a^2 + b^2 =25, and only (3,4),(4,3).\nBut is there any other pair where it might be tangent?\nFor example, if the line is tangent, but perhaps when a or b is zero, but die doesn't have zero.\nOr if denominator is zero, but if a=b=0, but not possible.\nSo I think only two.\nAnother way: the condition was \\frac{5}{\\sqrt{a^2+b^2}} =1, so \\sqrt{a^2+b^2}=5, so a^2+b^2=25.\nWith a,b integers 1 to 6, only 3^2+4^2=9+16=25, and permutations.\nYes.\nSo for part (1), \\frac{2}{36} = \\frac{1}{18}\n\nFor part (2), we have 14 favorable.\nBut just to be thorough, let me list all favorable pairs for part (2) again.\nFrom earlier:\n\n(3,3), (4,4), (5,5), (6,6) — four\n\n(5,1), (5,2), (5,3), (5,4), (5,6) — five\n\n(1,5), (2,5), (3,5), (4,5), (6,5) — five\n\nTotal 14.\nList them: 3,3;4,4;5,5;6,6; then 5,1;5,2;5,3;5,4;5,6; then 1,5;2,5;3,5;4,5;6,5.\nIs (3,5) there?\nYes, in the last list.\n(5,3) in the second list.\n(5,5) in first.\nAll distinct.\nTotal 4+5+5=14.\nYes.\nTotal 36, so 14/36=7/18.\nNow, so answers are:\n\n(1) \\frac{1}{18}\n\n(2) \\frac{7}{18}\n\nNow, to box them.\nSince it's two parts, perhaps box each.\nOr write:\n\nFor part (1): \\(\\boxed{\\dfrac{1}{18}}\\)\n\nFor part (2): \\(\\boxed{\\dfrac{7}{18}}\\)\n\nSince it's a single box, but probably not, as it's two questions.\nThe problem says \"find the probability\" for each, so likely separate boxes.\nI could write both.\nBut in the instruction, \"place your final result inside \\boxed{}\", but since two parts, probably box each.\nTo be safe, I can write the answers clearly.\nSo I think that's it.</continue_reasoning>\n</think>\n\n<relevant_doc_ids><|doc_147|>, <|doc_978|>, <|doc_389|>, <|doc_965|>, <|doc_300|>, <|doc_508|>, <|doc_235|>, <|doc_224|>, <|doc_482|>, <|doc_119|>, <|doc_504|>, <|doc_397|></>\n<summary>The current reasoning addresses both parts of the problem. For part (1), the approach uses the condition for tangency: the distance from the circle's center (0,0) to the line \\(ax + by + 5 = 0\\) must equal the radius (1). This simplifies to \\(a^2 + b^2 = 25\\). Since \\(a\\) and \\(b\\) are die outcomes (integers 1–6), the pairs satisfying this are (3,4) and (4,3), giving 2 favorable outcomes. For part (2), the approach identifies cases where segments \\(a\\), \\(b\\), and 5 form an isosceles triangle: \\(a = b \\geq 3\\), \\(a = 5\\) with \\(b \\neq 5\\), or \\(b = 5\\) with \\(a \\neq 5\\). This yields 4 + 5 + 5 = 14 favorable pairs after verifying triangle inequalities. The total outcomes are 36 for both parts. The current state has complete solutions: part (1) probability is \\(1/18\\), and part (2) is \\(7/18\\).</summary>\n<continue_reasoning>The current reasoning has fully solved both parts. For part (1), the solution is complete with 2 favorable pairs and probability \\(2/36 = 1/18\\). For part (2), the case analysis (14 favorable pairs) and probability calculation (\\(14/36 = 7/18\\)) are verified, with all listed pairs satisfying both the isosceles condition and strict triangle inequalities. No further steps are needed. The probabilities are:\n\n- Part (1): \\(\\frac{1}{18}\\)\n- Part (2): \\(\\frac{7}{18}\\)\n\nThe final answer is the pair of probabilities.\n\\boxed{\\dfrac{7}{18}}</continue_reasoning1>"
+#     text = text.split("</think>")[-1]
+#     result = extract_sft_content(text)
+#     print(result)
