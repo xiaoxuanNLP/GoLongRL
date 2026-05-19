@@ -1,12 +1,14 @@
 # 🎯 GoLongRL: Capability-Oriented Long Context Reinforcement Learning with Multitask Alignment
 
 <div align="center">
+
 [![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b.svg)](https://)
 [![Paper](https://img.shields.io/badge/Paper-Hugging%20Face-ffd21e?logo=huggingface)](https://)
 [![Model](https://img.shields.io/badge/%20Model-Hugging%20Face-2c74d7?logo=huggingface)](https://)
 [![Dataset](https://img.shields.io/badge/%20Dataset-Math%20RL-2c74d7?logo=huggingface)](https://)
 [![Dataset](https://img.shields.io/badge/%20Dataset-Code%20RL-2c74d7?logo=huggingface)](https://)
 [![Contact](https://img.shields.io/badge/📧%20Contact-Email-blue)](mailto:xiao_xuan_zi_666@163.com)
+
 </div>
 
 ## 📣 Latest News
@@ -15,11 +17,12 @@
 ## 📌 Overview
 We present **GoLongRL**, a fully open-source, capability-oriented post-training recipe for long-context reinforcement learning with verifiable rewards (RLVR). Existing long-context RL methods often treat data construction as a matter of designing increasingly complex retrieval paths, leading to homogeneous task coverage and reward formulations that inadequately reflect practical long-context requirements. GoLongRL addresses these limitations through two key contributions. **(1) Capability-oriented data construction**, a 23K-sample RLVR dataset spanning 9 task types with heterogeneous reward functions, and **(2) TMN-Reweight**, a multitask optimization method that combines task-level mean normalization for cross-task reward scale alignment with difficulty-adaptive reweighting for more reliable advantage estimation.
 
-
 <div align="center">
+
 <img src="./assets/main_result.png" width="100%"/>
 
 <sub>Overall performance comparison on long-context benchmarks (DocMath, LongBench-V2, Frames, MRCR, CorpusQA, LBV1-QA).</sub>
+
 </div>
 
 **GoLongRL-30B-A3B** achieves long-context performance comparable to DeepSeek-R1-0528 and Qwen3-235B-A22B-Thinking-2507, while using a significantly smaller activated parameter budget.
@@ -36,9 +39,9 @@ Our framework combines the following.
 
 1. **Capability-Oriented Dataset (23K samples, 9 task types).** Guided by a taxonomy of long-context capabilities, the dataset covers precise retrieval, comprehension, exhaustive retrieval, numerical reasoning, structured extraction, structured matching, graded ranking, sequence ordering, and summarization. Each task is paired with its natural evaluation metric (EM, Accuracy, F1, math_verify, IoU, SubEM, NDCG, Pairwise, ROUGE-L) as the reward function, rather than being collapsed into a single indicator.
 
+2. **TMN-Reweight.** When training on heterogeneous reward types, per-prompt normalization in standard GRPO can mix up cross-task scale differences with prompt difficulty. TMN-Reweight is a simple modification that normalizes advantages at the task level instead of the prompt level, and adds a difficulty-adaptive weight to reduce noise from very easy or very hard prompts. It provides a modest but consistent improvement over vanilla GRPO in our ablations (+0.8 avg. at 4B scale), with gains mainly on aggregation-intensive benchmarks like CorpusQA.
+
 3. **Full Open Release.** We publicly release the complete dataset, the four-phase construction pipeline, and all training code.
-
-
 
 ### Key Results
 
@@ -46,11 +49,12 @@ Our framework combines the following.
 - TMN-Reweight further improves average performance to 63.0 at 4B scale, surpassing QwenLong-L1.5 with its specialized AEPO algorithm (59.4).
 - General capabilities (MMLU-Pro, AIME24/25, GPQA) are preserved or improved, with substantial gains on dialogue memory (LongMemEval +13.6) and agentic memory benchmarks.
 
-
 <div align="center">
+
 <img src="./assets/pipeline.png" width="100%"/>
 
 <sub>Overview of the four-phase Capability-Oriented RLVR Dataset construction pipeline.</sub>
+
 </div>
 
 ## 🧪 Training
