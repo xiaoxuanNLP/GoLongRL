@@ -12,10 +12,14 @@
 </div>
 
 ## 📣 Latest News
+
 **[May 19, 2026]**  📢 GoLongRL is available on [arXiv](http://) and [HuggingFace Daily](http://).
 
 ## 📌 Overview
-We present **GoLongRL**, a fully open-source, capability-oriented post-training recipe for long-context reinforcement learning with verifiable rewards (RLVR). Existing long-context RL methods often treat data construction as a matter of designing increasingly complex retrieval paths, leading to homogeneous task coverage and reward formulations that inadequately reflect practical long-context requirements. GoLongRL addresses these limitations through two key contributions. **(1) Capability-oriented data construction**, a 23K-sample RLVR dataset spanning 9 task types with heterogeneous reward functions, and **(2) TMN-Reweight**, a multitask optimization method that combines task-level mean normalization for cross-task reward scale alignment with difficulty-adaptive reweighting for more reliable advantage estimation.
+
+We present **GoLongRL**, a fully open-source, capability-oriented post-training recipe for long-context reinforcement learning with verifiable rewards (RLVR). Existing long-context RL methods often treat data construction as a matter of designing increasingly complex retrieval paths, leading to homogeneous task coverage and reward formulations that inadequately reflect practical long-context requirements.
+
+GoLongRL addresses these limitations through two key contributions. **(1) Capability-oriented data construction**, a 23K-sample RLVR dataset spanning 9 task types with heterogeneous reward functions, and **(2) TMN-Reweight**, a multitask optimization method that combines task-level mean normalization for cross-task reward scale alignment with difficulty-adaptive reweighting for more reliable advantage estimation.
 
 <div align="center">
 
@@ -57,6 +61,8 @@ Our framework combines the following.
 
 </div>
 
+---
+
 ## 🧪 Training
 
 Training is built on [verl](https://github.com/volcengine/verl) with two RL algorithms:
@@ -83,6 +89,8 @@ bash examples/GoLongRL/qwen3-4B-grpo.sh           # GRPO baseline
 bash examples/GoLongRL/qwen3-4B-tmn-reweight.sh   # TMN-GRPO + difficulty reweighting
 ```
 
+---
+
 ## 🔍 Evaluation
 
 Evaluation uses **QwenLong-Benchmarks**, covering three capability dimensions:
@@ -104,6 +112,9 @@ export MODEL_NAME=your-model-name
 bash Eval/QwenLong-Benchmarks/evalscope/eval_mrcr.128K.sh
 ```
 
+---
+
 ## 🤝 Citation
+
 ```
 ```
