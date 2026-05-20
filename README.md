@@ -2,11 +2,11 @@
 
 <div align="center">
 
-[![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b.svg)](https://)
+[![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b.svg)](https://arxiv.org/abs/2605.19577)
 [![Paper](https://img.shields.io/badge/Paper-Hugging%20Face-ffd21e?logo=huggingface)](https://)
-[![Model](https://img.shields.io/badge/%20Model-Hugging%20Face-2c74d7?logo=huggingface)](https://)
-[![Dataset](https://img.shields.io/badge/%20Dataset-Math%20RL-2c74d7?logo=huggingface)](https://)
-[![Dataset](https://img.shields.io/badge/%20Dataset-Code%20RL-2c74d7?logo=huggingface)](https://)
+[![Model](https://img.shields.io/badge/%20Model-GoLongRL-4B-2c74d7?logo=huggingface)](https://huggingface.co/Kwai-Klear/GoLongRL-4B)
+[![Model](https://img.shields.io/badge/%20Model-GoLongRL-30B-A3B-2c74d7?logo=huggingface)](https://huggingface.co/Kwai-Klear/GoLongRL-30B-A3B)
+[![Dataset](https://img.shields.io/badge/%20Dataset-GoLongRL-2c74d7?logo=huggingface)](https://huggingface.co/datasets/Kwai-Klear/GoLongRL)
 [![Contact](https://img.shields.io/badge/📧%20Contact-Email-blue)](mailto:xiao_xuan_zi_666@163.com)
 
 </div>
@@ -17,7 +17,9 @@
 
 ## 📌 Overview
 
-We present **GoLongRL**, a fully open-source, capability-oriented post-training recipe for long-context reinforcement learning with verifiable rewards (RLVR). Existing long-context RL methods often treat data construction as a matter of designing increasingly complex retrieval paths, leading to homogeneous task coverage and reward formulations that inadequately reflect practical long-context requirements.
+We present **GoLongRL**, a fully open-source, capability-oriented post-training recipe for long-context reinforcement learning with verifiable rewards (RLVR). GoLongRL-30B-A3B achieves long-context performance comparable to DeepSeek-R1-0528 and Qwen3-235B-A22B-Thinking-2507, while using a significantly smaller activated parameter budget. Under the same vanilla GRPO setup, our dataset alone outperforms the closed-source QwenLong-L1.5 dataset by **+6.1** at the 4B scale and **+2.6** at 30B.
+
+Existing long-context RL methods tend to focus data construction on retrieval-path complexity—multi-hop chains, UUID tracking, chunk-based QA—while collapsing diverse task objectives into a single binary reward. This leaves critical capabilities such as summarization, ranking, aggregation, and structured reasoning without direct training signal. GoLongRL addresses these limitations through two contributions.
 
 GoLongRL addresses these limitations through two key contributions. **(1) Capability-oriented data construction**, a 23K-sample RLVR dataset spanning 9 task types with heterogeneous reward functions, and **(2) TMN-Reweight**, a multitask optimization method that combines task-level mean normalization for cross-task reward scale alignment with difficulty-adaptive reweighting for more reliable advantage estimation.
 
