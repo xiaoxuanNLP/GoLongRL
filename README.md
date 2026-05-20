@@ -13,7 +13,7 @@
 
 ## 📣 Latest News
 
-**[May 19, 2026]**  📢 GoLongRL is available on [arXiv](http://) and [HuggingFace Daily](http://).
+**[May 19, 2026]**  📢 GoLongRL is available on [arXiv](https://arxiv.org/abs/2605.19577) and [HuggingFace Daily](http://).
 
 ## 📌 Overview
 
@@ -119,4 +119,13 @@ bash Eval/QwenLong-Benchmarks/evalscope/eval_mrcr.128K.sh
 ## 🤝 Citation
 
 ```
+@misc{lv2026golongrlcapabilityorientedlongcontext,
+      title={GoLongRL: Capability-Oriented Long Context Reinforcement Learning with Multitask Alignment}, 
+      author={Minxuan Lv and Tiehua Mei and Tanlong Du and Junmin Chen and Zhenpeng Su and Ziyang Chen and Ziqi Wang and Zhennan Wu and Ruotong Pan and jian Liang and Ruiming Tang and Han Li},
+      year={2026},
+      eprint={2605.19577},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2605.19577}, 
+}
 ```
