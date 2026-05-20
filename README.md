@@ -78,7 +78,7 @@ Supported models: **Qwen3-4B**, **Qwen3-30B-A3B** (MoE). Training runs on 16 nod
 
 The capability-oriented training set (23K samples, 9 task types) is publicly available:
 
-**Dataset**: [Kwai-Klear/GoLongRL-23K](https://huggingface.co/datasets/Kwai-Klear/GoLongRL-23K)
+**Dataset**: [Kwai-Klear/GoLongRL-23K](https://huggingface.co/datasets/Kwai-Klear/GoLongRL)
 
 For full setup, data format, hyperparameters, and monitoring details, see [Train/verl/README.md](Train/verl/README.md).
 
