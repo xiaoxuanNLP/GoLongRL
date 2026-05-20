@@ -3,7 +3,7 @@
 <div align="center">
 
 [![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b.svg)](https://arxiv.org/abs/2605.19577)
-[![Paper](https://img.shields.io/badge/Paper-Hugging%20Face-ffd21e?logo=huggingface)](https://)
+[![Paper](https://img.shields.io/badge/Paper-Hugging%20Face-ffd21e?logo=huggingface)](https://huggingface.co/papers/2605.19577)
 [![Model](https://img.shields.io/badge/Model-GoLongRL--4B-2c74d7?logo=huggingface)](https://huggingface.co/Kwai-Klear/GoLongRL-4B)
 [![Model](https://img.shields.io/badge/Model-GoLongRL--30B--A3B-2c74d7?logo=huggingface)](https://huggingface.co/Kwai-Klear/GoLongRL-30B-A3B)
 [![Dataset](https://img.shields.io/badge/%20Dataset-GoLongRL-2c74d7?logo=huggingface)](https://huggingface.co/datasets/Kwai-Klear/GoLongRL)
@@ -13,7 +13,7 @@
 
 ## 📣 Latest News
 
-**[May 19, 2026]**  📢 GoLongRL is available on [arXiv](https://arxiv.org/abs/2605.19577) and [HuggingFace Daily](http://).
+**[May 19, 2026]**  📢 GoLongRL is available on [arXiv](https://arxiv.org/abs/2605.19577) and [HuggingFace Daily](https://huggingface.co/papers/2605.19577).
 
 ## 📌 Overview
 
