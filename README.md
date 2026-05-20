@@ -4,8 +4,8 @@
 
 [![Paper](https://img.shields.io/badge/Paper-arXiv-b31b1b.svg)](https://arxiv.org/abs/2605.19577)
 [![Paper](https://img.shields.io/badge/Paper-Hugging%20Face-ffd21e?logo=huggingface)](https://)
-[![Model](https://img.shields.io/badge/%20Model-GoLongRL-4B-2c74d7?logo=huggingface)](https://huggingface.co/Kwai-Klear/GoLongRL-4B)
-[![Model](https://img.shields.io/badge/%20Model-GoLongRL-30B-A3B-2c74d7?logo=huggingface)](https://huggingface.co/Kwai-Klear/GoLongRL-30B-A3B)
+[![Model](https://img.shields.io/badge/Model-GoLongRL--4B-2c74d7?logo=huggingface)](https://huggingface.co/Kwai-Klear/GoLongRL-4B)
+[![Model](https://img.shields.io/badge/Model-GoLongRL--30B--A3B-2c74d7?logo=huggingface)](https://huggingface.co/Kwai-Klear/GoLongRL-30B-A3B)
 [![Dataset](https://img.shields.io/badge/%20Dataset-GoLongRL-2c74d7?logo=huggingface)](https://huggingface.co/datasets/Kwai-Klear/GoLongRL)
 [![Contact](https://img.shields.io/badge/📧%20Contact-Email-blue)](mailto:xiao_xuan_zi_666@163.com)
 
