@@ -35,6 +35,7 @@ GoLongRL addresses these limitations through two key contributions. **(1) Capabi
 
 | Model | Avg. | DocMath | LBV2 | Frames | MRCR | CorpusQA | LBV1-QA |
 |---|---|---|---|---|---|---|---|
+| Qwen3-30B-A3B-Thinking-2507 | 60.1 | 63.3 | 48.7 | 70.2 | 41.6 | 70.5 | 66.5|
 | DeepSeek-R1-0528 | 68.7 | 63.4 | 59.5 | 76.9 | 64.9 | 77.5 | 69.9 |
 | Qwen3-235B-A22B-Thinking | 68.5 | 65.8 | 57.5 | 75.1 | 66.2 | 75.3 | 70.9 |
 | Gemini-2.5-Flash-Thinking | 68.7 | 64.8 | 56.8 | 65.8 | 78.8 | 79.4 | 66.9 |
