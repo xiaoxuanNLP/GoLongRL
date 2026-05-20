@@ -2,6 +2,8 @@
 
 QwenLong 系列模型的评测脚本集合，涵盖长文本理解、推理、记忆及通用能力等多个维度。
 
+你可以直接在[Kwai-Klear](https://huggingface.co/Kwai-Klear) 下载评测数据并放到GoLongRL/Eval/Qwenlong-Benchmarks/evalscope下
+
 [English](README.md)
 
 ---
