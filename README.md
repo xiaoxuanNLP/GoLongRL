@@ -17,7 +17,7 @@
 
 ## 📌 Overview
 
-We present **GoLongRL**, a fully open-source, capability-oriented post-training recipe for long-context reinforcement learning with verifiable rewards (RLVR). Under the same vanilla GRPO setup, our dataset alone outperforms the closed-source QwenLong-L1.5 dataset by **+6.1** at the 4B scale and **+2.6** at 30B.
+We present **GoLongRL**, a fully open-source, capability-oriented post-training recipe for long-context reinforcement learning with verifiable rewards (RLVR). 
 
 Existing long-context RL methods tend to focus data construction on retrieval-path complexity—multi-hop chains, UUID tracking, chunk-based QA—while collapsing diverse task objectives into a single binary reward. This leaves critical capabilities such as summarization, ranking, aggregation, and structured reasoning without direct training signal. GoLongRL addresses these limitations through two contributions.
 
