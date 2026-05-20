@@ -2,6 +2,8 @@
 
 Evaluation scripts for the QwenLong model series, covering long-context understanding, reasoning, memory, and general capabilities.
 
+You can directly download the evaluation data from [Kwai-Klear/GoLongRL-Eval](https://huggingface.co/datasets/Kwai-Klear/GoLongRL-Eval) and place it under GoLongRL/Eval/Qwenlong-Benchmarks/evalscope.
+
 [中文](README_zh.md)
 
 ---
