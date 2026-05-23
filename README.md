@@ -48,7 +48,7 @@ Our framework combines the following.
 
 2. **TMN-Reweight.** When training on heterogeneous reward types, per-prompt normalization in standard GRPO can mix up cross-task scale differences with prompt difficulty. TMN-Reweight is a simple modification that normalizes advantages at the task level instead of the prompt level, and adds a difficulty-adaptive weight to reduce noise from very easy or very hard prompts. It provides a modest but consistent improvement over vanilla GRPO in our ablations (+0.8 avg. at 4B scale), with gains mainly on aggregation-intensive benchmarks like CorpusQA.
 
-3. **Full Open Release.** We publicly release the complete dataset, the four-phase construction pipeline, and all training code.
+3. **Full Open Release.** We publicly release the complete dataset and all training code.
 
 ### Key Results
 
