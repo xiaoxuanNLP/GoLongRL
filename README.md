@@ -90,6 +90,8 @@ export TEST_FILE=/path/to/test.jsonl
 
 bash examples/GoLongRL/qwen3-4B-grpo.sh           # GRPO baseline
 bash examples/GoLongRL/qwen3-4B-tmn-reweight.sh   # TMN-GRPO + difficulty reweighting
+bash examples/GoLongRL/qwen3-4B-tmn-only.sh       # TMN-only ablation
+bash examples/GoLongRL/qwen3-4B-reweight-only.sh  # Reweight-only ablation
 ```
 
 ---

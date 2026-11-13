@@ -16,9 +16,7 @@ GRPO 的扩展版本，在 **reward 类型组内**（而非全局）归一化优
 
 #### 难度重加权
 
-开启 `difficulty_reweight=True` 时，样本按每个 prompt 的通过率进行重加权：
-- 难题（通过率低）→ 权重高
-- 简单题（通过率高）→ 权重低
+开启 `difficulty_reweight=True` 时，GRPO 与 TMN 使用相同的难度权重。相对通过率是每个 prompt 的原始 rollout reward 超过下述平滑阈值的比例。正优势乘 `exp(gamma * (0.5 - pass_rate))`，负优势乘 `exp(gamma * (pass_rate - 0.5))`。因此，难题放大正优势、减小负优势，简单题则相反。
 
 通过率基于平滑均值计算：
 
@@ -35,6 +33,8 @@ uid_smoothed_mean = α × uid_mean + (1 - α) × mode_mean
 | 脚本 | 模型 | 算法 | 规模 |
 |------|------|------|------|
 | `qwen3-4B-grpo.sh` | Qwen3-4B | GRPO | 16 节点 × 8 GPU |
+| `qwen3-4B-tmn-only.sh` | Qwen3-4B | 仅 TMN，关闭难度重加权 | 16 节点 × 8 GPU |
+| `qwen3-4B-reweight-only.sh` | Qwen3-4B | GRPO + 难度重加权 | 16 节点 × 8 GPU |
 | `qwen3-4B-tmn-reweight.sh` | Qwen3-4B | TMN-GRPO + 难度重加权 | 16 节点 × 8 GPU |
 | `qwen3-30B-A3B-grpo.sh` | Qwen3-30B-A3B (MoE) | GRPO | 16 节点 × 8 GPU |
 
@@ -52,9 +52,17 @@ bash examples/GoLongRL/qwen3-4B-grpo.sh
 # TMN-GRPO + 难度重加权
 bash examples/GoLongRL/qwen3-4B-tmn-reweight.sh
 
+# 组件消融（与联合方法复用同一套训练参数）
+bash examples/GoLongRL/qwen3-4B-tmn-only.sh
+bash examples/GoLongRL/qwen3-4B-reweight-only.sh
+
 # 多节点启动（第一个参数传 hostfile）
 bash examples/GoLongRL/qwen3-4B-tmn-reweight.sh /etc/mpi/hostfile
 ```
+
+两份消融脚本复用 `qwen3-4B-tmn-reweight.sh`，使用独立的实验名和默认 checkpoint 目录。TMN-only 设置 `adv_estimator=tmn_grpo`、`difficulty_reweight=False`。Reweight-only 设置 `adv_estimator=grpo`、`difficulty_reweight=True`，保留标准 GRPO 的逐 prompt 标准差归一化，并使用与联合方法完全相同的加权规则。两个加权版本均默认 alpha=0.8、gamma=1.0，可通过 `DIFFICULTY_SMOOTH_ALPHA`、`DIFFICULTY_GAMMA` 覆盖。如果手动指定 `CKPT_DIR`，请为不同实验使用不同目录，因为脚本会自动恢复训练。
+
+**实现修复：** GRPO 训练入口现在会传递 `difficulty_reweight`、`difficulty_smooth_alpha` 和 `difficulty_gamma`；旧版本即使在 GRPO 启动脚本中开启重加权，也会被静默忽略。原 GRPO 中仅对正优势加权并截断权重的分支，已替换为与 TMN 共用的实现。Reweight-only 与 TMN 均需要任务标签（顶层或 `extra_info` 中的 `reward_mode`）；普通 GRPO 不要求该字段。这些脚本是实验配置，不代表已经完成消融实验。
 
 ### 关键超参数
 
@@ -63,6 +71,7 @@ bash examples/GoLongRL/qwen3-4B-tmn-reweight.sh /etc/mpi/hostfile
 | `adv_estimator` | `tmn_grpo` / `grpo` | 优势值估计算法 |
 | `difficulty_reweight` | `True` | 是否开启难度重加权 |
 | `difficulty_smooth_alpha` | `0.8` | 通过率估计的平滑系数 |
+| `difficulty_gamma` | `1.0` | 指数难度权重的强度 |
 | `n_resp_per_prompt` | `16` | 每个 prompt 的 rollout 采样数 |
 | `train_prompt_bsz` | `128` | 训练批大小（prompt 数） |
 | `gen_prompt_bsz` | `512` | 生成批大小（prompt 数） |

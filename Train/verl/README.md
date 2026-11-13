@@ -19,9 +19,7 @@ An extension of GRPO that normalizes advantages within **reward-type groups** ra
 
 #### Difficulty Reweighting
 
-When `difficulty_reweight=True`, samples are reweighted based on per-prompt pass rate:
-- Hard prompts (low pass rate) → higher weight
-- Easy prompts (high pass rate) → lower weight
+When `difficulty_reweight=True`, GRPO and TMN use the same difficulty weights. The relative pass rate is the fraction of raw rollout rewards exceeding the smoothed threshold below. Positive advantages receive `exp(gamma * (0.5 - pass_rate))`; negative advantages receive `exp(gamma * (pass_rate - 0.5))`. Thus hard prompts amplify positive advantages and attenuate negative ones, with the reverse for easy prompts.
 
 The pass rate is computed using a smoothed mean:
 
@@ -38,6 +36,8 @@ where `difficulty_smooth_alpha` (α) controls the blend between prompt-level mea
 | Script | Model | Algorithm | Scale |
 |--------|-------|-----------|-------|
 | `qwen3-4B-grpo.sh` | Qwen3-4B | GRPO | 16 nodes × 8 GPUs |
+| `qwen3-4B-tmn-only.sh` | Qwen3-4B | TMN without difficulty reweighting | 16 nodes × 8 GPUs |
+| `qwen3-4B-reweight-only.sh` | Qwen3-4B | GRPO + difficulty reweighting | 16 nodes × 8 GPUs |
 | `qwen3-4B-tmn-reweight.sh` | Qwen3-4B | TMN-GRPO + difficulty reweight | 16 nodes × 8 GPUs |
 | `qwen3-30B-A3B-grpo.sh` | Qwen3-30B-A3B (MoE) | GRPO | 16 nodes × 8 GPUs |
 
@@ -55,9 +55,17 @@ bash examples/GoLongRL/qwen3-4B-grpo.sh
 # TMN-GRPO with difficulty reweighting
 bash examples/GoLongRL/qwen3-4B-tmn-reweight.sh
 
+# Component ablations (same shared training settings as the joint run)
+bash examples/GoLongRL/qwen3-4B-tmn-only.sh
+bash examples/GoLongRL/qwen3-4B-reweight-only.sh
+
 # Multi-node launch (pass hostfile as first arg)
 bash examples/GoLongRL/qwen3-4B-tmn-reweight.sh /etc/mpi/hostfile
 ```
+
+The two ablation scripts reuse `qwen3-4B-tmn-reweight.sh`, with separate experiment names and default checkpoint directories. TMN-only sets `adv_estimator=tmn_grpo` and `difficulty_reweight=False`. Reweight-only sets `adv_estimator=grpo` and `difficulty_reweight=True`, retaining per-prompt GRPO standard-deviation normalization and the exact same weighting rule as the joint method. Both weighted variants default to alpha 0.8 and gamma 1.0; these can be overridden with `DIFFICULTY_SMOOTH_ALPHA` and `DIFFICULTY_GAMMA`. Use distinct `CKPT_DIR` values if overriding the defaults, since training resumes automatically.
+
+**Implementation fix:** the GRPO trainer now forwards `difficulty_reweight`, `difficulty_smooth_alpha`, and `difficulty_gamma`. Previously, enabling reweighting in a GRPO launch script was silently ignored. The old positive-only, clipped GRPO weighting branch has been replaced by the shared TMN weighting rule. Task labels (`reward_mode`, top-level or in `extra_info`) are required for Reweight-only as well as TMN. Vanilla GRPO still works without task labels. These scripts provide experiment configurations, not completed ablation results.
 
 ### Key Hyperparameters
 
@@ -66,6 +74,7 @@ bash examples/GoLongRL/qwen3-4B-tmn-reweight.sh /etc/mpi/hostfile
 | `adv_estimator` | `tmn_grpo` / `grpo` | Advantage estimator |
 | `difficulty_reweight` | `True` | Enable difficulty-based sample reweighting |
 | `difficulty_smooth_alpha` | `0.8` | Smoothing factor for pass-rate estimation |
+| `difficulty_gamma` | `1.0` | Exponential difficulty-weight strength |
 | `n_resp_per_prompt` | `16` | Rollout samples per prompt |
 | `train_prompt_bsz` | `128` | Training batch size (prompts) |
 | `gen_prompt_bsz` | `512` | Generation batch size (prompts) |

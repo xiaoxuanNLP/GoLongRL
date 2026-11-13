@@ -262,6 +262,54 @@ def compute_gae_advantage_return(
     return advantages, returns
 
 
+def _compute_difficulty_weights(
+    scores: torch.Tensor,
+    index: np.ndarray,
+    reward_mode: np.ndarray,
+    difficulty_gamma: float,
+    difficulty_smooth_alpha: float,
+) -> tuple[torch.Tensor, dict[str, float]]:
+    """Compute the same task-smoothed, sign-dependent weights for GRPO and TMN.
+
+    ``scores`` must contain raw outcome rewards, before advantage normalization.
+    """
+    if reward_mode is None:
+        raise ValueError("Difficulty reweighting requires reward_mode for task-local smoothing.")
+
+    inv_uid = torch.from_numpy(np.unique(np.asarray(index), return_inverse=True)[1]).to(scores.device)
+    inv_mode = torch.from_numpy(np.unique(np.asarray(reward_mode), return_inverse=True)[1]).to(scores.device)
+    num_uid = int(inv_uid.max().item()) + 1
+    num_mode = int(inv_mode.max().item()) + 1
+
+    uid_count = torch.bincount(inv_uid, minlength=num_uid).to(scores.dtype)
+    uid_sum = torch.bincount(inv_uid, weights=scores, minlength=num_uid)
+    uid_mean = uid_sum / uid_count.clamp_min(1)
+    one = uid_count <= 1
+    # Preserve the existing TMN/GRPO convention for singleton groups.
+    uid_mean = torch.where(one, torch.zeros_like(uid_mean), uid_mean)
+
+    uid_mode = torch.full((num_uid,), -1, device=scores.device, dtype=torch.long)
+    uid_mode[inv_uid] = inv_mode
+    mode_uid_count = torch.bincount(uid_mode, minlength=num_mode).to(scores.dtype).clamp_min(1)
+    mode_mean_sum = torch.bincount(uid_mode, weights=uid_mean, minlength=num_mode)
+    mode_mean = mode_mean_sum / mode_uid_count
+
+    uid_smoothed_mean = (
+        difficulty_smooth_alpha * uid_mean + (1 - difficulty_smooth_alpha) * mode_mean[uid_mode]
+    )
+    uid_smoothed_mean = torch.where(one, mode_mean[uid_mode], uid_smoothed_mean)
+    is_correct = (scores > uid_smoothed_mean[inv_uid]).float()
+    uid_correct = torch.bincount(inv_uid, weights=is_correct, minlength=num_uid)
+    uid_pass_rate = uid_correct / uid_count.clamp_min(1)
+
+    uid_pos_weight = torch.exp(difficulty_gamma * (0.5 - uid_pass_rate))
+    uid_neg_weight = torch.exp(difficulty_gamma * (uid_pass_rate - 0.5))
+    sample_weight = torch.where(
+        scores > uid_mean[inv_uid], uid_pos_weight[inv_uid], uid_neg_weight[inv_uid]
+    )
+    return sample_weight, {"difficulty/mean_pass_rate": uid_pass_rate.mean().item()}
+
+
 # NOTE(sgm): this implementation only consider outcome supervision, where the reward is a scalar.
 @register_adv_est(AdvantageEstimator.GRPO)  # or simply: @register_adv_est("grpo")
 def compute_grpo_outcome_advantage(
@@ -273,6 +321,8 @@ def compute_grpo_outcome_advantage(
     difficulty_reweight: bool = False,
     difficulty_gamma: float = 1.0,
     config: Optional[AlgoConfig] = None,
+    reward_mode: Optional[np.ndarray] = None,
+    difficulty_smooth_alpha: float = 0.5,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Compute advantage for GRPO, operating only on Outcome reward
@@ -291,6 +341,10 @@ def compute_grpo_outcome_advantage(
             whether to scale the GRPO advantage
         config: `(Optional[AlgoConfig])`
             algorithm configuration object
+        reward_mode: `(Optional[np.ndarray])`
+            task labels; required only when difficulty_reweight is enabled
+        difficulty_smooth_alpha: `(float)`
+            mixture of prompt mean and task mean for the relative-success threshold
 
     Note:
         If norm_adv_by_std_in_grpo is True, the advantage is scaled by the std, as in the original GRPO.
@@ -312,6 +366,12 @@ def compute_grpo_outcome_advantage(
     id2std = {}
 
     with torch.no_grad():
+        # Compute from raw rewards before the in-place normalization below.
+        sample_weight = None
+        if difficulty_reweight:
+            sample_weight, _ = _compute_difficulty_weights(
+                scores, index, reward_mode, difficulty_gamma, difficulty_smooth_alpha
+            )
         bsz = scores.shape[0]
         for i in range(bsz):
             id2score[index[i]].append(scores[i])
@@ -331,34 +391,8 @@ def compute_grpo_outcome_advantage(
                 scores[i] = (scores[i] - id2mean[index[i]]) / (id2std[index[i]] + epsilon)
             else:
                 scores[i] = scores[i] - id2mean[index[i]]
-        # ── difficulty reweighting ───────────────────────────────────────
-        if difficulty_reweight:
-            # 计算每个 uid 的 pass rate
-            # 用 score > uid_mean 定义正确，在 advantage 计算之前的原始 scores 上判断
-            # 此时 scores 已经是 normalized advantage 了，sign > 0 等价于原始 score > uid_mean
-            id2pass_rate = {}
-            for idx in id2score:
-                g = len(id2score[idx])
-                if g <= 1:
-                    # 单个 rollout 无法计算 pass rate，权重设为 1（不调整）
-                    id2pass_rate[idx] = 0.5
-                else:
-                    mean = id2mean[idx]
-                    n_correct = sum(1 for s in id2score[idx] if s > mean)
-                    id2pass_rate[idx] = n_correct / g
-
-            # 乘上难度权重
-            # pass_rate < 0.5 (难题) -> weight > 1 -> 放大 advantage
-            # pass_rate > 0.5 (简单题) -> weight < 1 -> 压缩 advantage
-            # pass_rate = 0.5 -> weight = 1 -> 不变
-            for i in range(bsz):
-                # 只对正样本加权，负样本权重保持1
-                if scores[i] > 0:
-                    pass_rate = id2pass_rate[index[i]]
-                    weight = torch.exp(torch.tensor(difficulty_gamma * (0.5 - pass_rate)))
-                    weight = torch.clamp(weight, 1.0, 2.0)
-                    scores[i] = scores[i] * weight
-        # ────────────────────────────────────────────────────────────────
+        if sample_weight is not None:
+            scores = scores * sample_weight
 
         scores = scores.unsqueeze(-1) * response_mask
 
@@ -467,41 +501,8 @@ def compute_tmn_grpo_outcome_advantage(
         # ── difficulty reweighting ──────────────────────────────────────────
         extra_metrics = {}
         if difficulty_reweight:
-            # 1. 计算任务级别的平均分（同任务内所有 prompt 的 mean 的均值）
-            # 语义：这个任务在当前 batch 里整体的分数水平
-            mode_mean_sum = torch.bincount(uid_mode, weights=uid_mean, minlength=num_mode)
-            mode_mean = mode_mean_sum / mode_uid_count  # shape: (num_mode,)
-
-            # 2. 平滑 uid_mean：混合 uid 自身均值 和 同任务均值
-            # alpha=1: 完全用 uid 自身均值（无平滑）
-            # alpha=0: 完全用任务均值
-            uid_smoothed_mean = (
-                difficulty_smooth_alpha * uid_mean
-                + (1 - difficulty_smooth_alpha) * mode_mean[uid_mode]
-            )
-            # 单 rollout 的 uid 直接用任务均值
-            uid_smoothed_mean = torch.where(one, mode_mean[uid_mode], uid_smoothed_mean)
-
-            # 3. 用平滑后的 mean 定义正确，计算 pass rate
-            is_correct = (scores > uid_smoothed_mean[inv_uid]).float()
-            uid_correct = torch.bincount(inv_uid, weights=is_correct, minlength=num_uid)
-            uid_pass_rate = uid_correct / uid_count.clamp_min(1)
-
-            # 4. 难度权重
-            uid_pos_weight = torch.exp(difficulty_gamma * (0.5 - uid_pass_rate))
-            uid_neg_weight = torch.exp(difficulty_gamma * (uid_pass_rate - 0.5))
-
-            extra_metrics["difficulty/mean_pass_rate"] = uid_pass_rate.mean().item()
-
-            # extra_metrics["difficulty/weight_clamp_upper_ratio"] = (uid_weight_raw > 2.0).float().mean().item()
-            # extra_metrics["difficulty/weight_clamp_lower_ratio"] = (uid_weight_raw < 1.0).float().mean().item()
-            extra_metrics["difficulty/mean_pass_rate"] = uid_pass_rate.mean().item()
-            # 5. 对正负样本（score > smoothed_mean）乘权重
-            is_positive = scores > uid_mean[inv_uid]
-            sample_weight = torch.where(
-                is_positive,
-                uid_pos_weight[inv_uid],
-                uid_neg_weight[inv_uid],
+            sample_weight, extra_metrics = _compute_difficulty_weights(
+                scores, index, reward_mode, difficulty_gamma, difficulty_smooth_alpha
             )
             scalars = scalars * sample_weight
         # ───────────────────────────────────────────────────────────────────
@@ -953,7 +954,9 @@ def compute_rewards(token_level_scores, old_log_prob, ref_log_prob, kl_ratio):
     return token_level_scores - kl * kl_ratio
 
 
-def agg_loss(loss_mat: torch.Tensor, loss_mask: torch.Tensor, loss_agg_mode: str, loss_scale_factor: Optional[int] = None):
+def agg_loss(
+    loss_mat: torch.Tensor, loss_mask: torch.Tensor, loss_agg_mode: str, loss_scale_factor: Optional[int] = None
+):
     """
     Aggregate the loss matrix into a scalar.
 

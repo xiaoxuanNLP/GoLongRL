@@ -5,11 +5,11 @@ mkdir -p output
 
 LLM=${LLM:-"/path/to/Qwen3-4B"}
 
-HOME=$(pwd)
+work_dir=$(pwd)
 timestamp=$(date +"%Y-%m-%d-%H:%M:%S")
 
 project_name='GoLongRL'
-experiment_name='Qwen3-4B-tmn-reweight'
+experiment_name=${EXPERIMENT_NAME:-Qwen3-4B-tmn-reweight}
 
 # ============================================================================
 # Offload
@@ -23,7 +23,7 @@ ACTOR_PARAM_OFFLOAD=${ACTOR_PARAM_OFFLOAD:-$COMMON_PARAM_OFFLOAD}
 ACTOR_GRAD_OFFLOAD=${ACTOR_GRAD_OFFLOAD:-$COMMON_GRAD_OFFLOAD}
 ACTOR_OPTIMIZER_OFFLOAD=${ACTOR_OPTIMIZER_OFFLOAD:-$COMMON_OPTIMIZER_OFFLOAD}
 
-CKPT_DIR=${CKPT_DIR:-"${HOME}/ckpts/${project_name}/${experiment_name}/"}
+CKPT_DIR=${CKPT_DIR:-"${work_dir}/ckpts/${project_name}/${experiment_name}/"}
 mkdir -p $CKPT_DIR
 ROLLOUT_DATA_DIR=${CKPT_DIR}rollout_outputs
 mkdir -p $ROLLOUT_DATA_DIR
@@ -59,12 +59,13 @@ fi
 # ============================================================================
 # Algorithm
 # ============================================================================
-adv_estimator=tmn_grpo
+adv_estimator=${ADV_ESTIMATOR:-tmn_grpo}
 
 loss_mode="vanilla"
 
-difficulty_reweight=True
-difficulty_smooth_alpha=0.8
+difficulty_reweight=${DIFFICULTY_REWEIGHT:-True}
+difficulty_smooth_alpha=${DIFFICULTY_SMOOTH_ALPHA:-0.8}
+difficulty_gamma=${DIFFICULTY_GAMMA:-1.0}
 
 use_kl_in_reward=False
 kl_coef=0.0
@@ -166,7 +167,7 @@ PYTHONUNBUFFERED=1 python3 -m recipe.dapo.main_dapo --config-name='dapo_megatron
     +ray_kwargs.ray_init.runtime_env.env_vars.NCCL_PXN_DISABLE="1" \
     +ray_kwargs.ray_init.runtime_env.env_vars.NCCL_IB_QPS_PER_CONNECTION="4" \
     +ray_kwargs.ray_init.runtime_env.env_vars.WANDB_API_KEY="${WANDB_API_KEY}" \
-    +ray_kwargs.ray_init.runtime_env.env_vars.WORK_DIR=$HOME \
+    +ray_kwargs.ray_init.runtime_env.env_vars.WORK_DIR=$work_dir \
     +ray_kwargs.ray_init.runtime_env.env_vars.GLOO_SOCKET_IFNAME="bond0" \
     +ray_kwargs.ray_init.runtime_env.env_vars.TIMESTAMP=$timestamp \
     +ray_kwargs.ray_init.runtime_env.env_vars.SGL_ENABLE_JIT_DEEPGEMM="False" \
@@ -247,6 +248,7 @@ PYTHONUNBUFFERED=1 python3 -m recipe.dapo.main_dapo --config-name='dapo_megatron
     actor_rollout_ref.rollout.agent.num_workers=${NUM_WORKER} \
     +algorithm.difficulty_reweight=${difficulty_reweight} \
     +algorithm.difficulty_smooth_alpha=${difficulty_smooth_alpha} \
+    +algorithm.difficulty_gamma=${difficulty_gamma} \
     +actor_rollout_ref.rollout.engine_kwargs.sglang.disable_radix_cache=False \
     +actor_rollout_ref.rollout.engine_kwargs.sglang.log_level=info \
     +actor_rollout_ref.rollout.engine_kwargs.sglang.disable_cuda_graph=False \

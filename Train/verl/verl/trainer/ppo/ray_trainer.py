@@ -43,13 +43,13 @@ from verl.trainer.config import AlgoConfig
 from verl.trainer.ppo import core_algos
 from verl.trainer.ppo.core_algos import AdvantageEstimator, agg_loss
 from verl.trainer.ppo.metric_utils import (
+    TASK_METRIC_CONFIG,
     compute_data_metrics,
     compute_throughout_metrics,
     compute_timing_metrics,
     compute_variance_proxy_metrics,
     process_validation_metrics,
 )
-from verl.trainer.ppo.metric_utils import TASK_METRIC_CONFIG
 from verl.trainer.ppo.reward import extract_reward
 from verl.trainer.ppo.utils import Role, WorkerType, need_critic, need_reference_policy, need_reward_model
 from verl.utils import tensordict_utils as tu
@@ -127,6 +127,28 @@ def compute_response_mask(data: DataProto):
     return attention_mask[:, -response_length:]
 
 
+def _get_reward_mode(data: DataProto) -> np.ndarray:
+    """Resolve task labels for TMN and for GRPO with difficulty reweighting."""
+    if "reward_mode" in data.non_tensor_batch:
+        return data.non_tensor_batch["reward_mode"]
+    if "extra_info" in data.non_tensor_batch:
+        reward_mode = np.array(
+            [
+                TASK_METRIC_CONFIG.get(ei.get("reward_mode", ""), ei.get("reward_mode", ""))
+                if isinstance(ei, dict)
+                else ""
+                for ei in data.non_tensor_batch["extra_info"]
+            ]
+        )
+        # Also make the mapped labels available to task-level metrics.
+        data.non_tensor_batch["reward_mode"] = reward_mode
+        return reward_mode
+    raise ValueError(
+        "Task-aware advantage estimation requires 'reward_mode'. It must be either a top-level field in "
+        "non_tensor_batch or nested inside 'extra_info'. Please ensure your dataset provides it."
+    )
+
+
 def compute_advantage(
     data: DataProto,
     adv_estimator: AdvantageEstimator,
@@ -178,6 +200,15 @@ def compute_advantage(
     elif adv_estimator == AdvantageEstimator.GRPO:
         # Initialize the mask for GRPO calculation
         grpo_calculation_mask = data.batch["response_mask"]
+        difficulty_kwargs = {}
+        if config is not None:
+            difficulty_kwargs = {
+                "difficulty_reweight": config.get("difficulty_reweight", False),
+                "difficulty_gamma": config.get("difficulty_gamma", 1.0),
+                "difficulty_smooth_alpha": config.get("difficulty_smooth_alpha", 0.5),
+            }
+        if difficulty_kwargs.get("difficulty_reweight", False):
+            difficulty_kwargs["reward_mode"] = _get_reward_mode(data)
 
         # Call compute_grpo_outcome_advantage with parameters matching its definition
         advantages, returns = core_algos.compute_grpo_outcome_advantage(
@@ -185,6 +216,7 @@ def compute_advantage(
             response_mask=grpo_calculation_mask,
             index=data.non_tensor_batch["uid"],
             norm_adv_by_std_in_grpo=norm_adv_by_std_in_grpo,
+            **difficulty_kwargs,
         )
         data.batch["advantages"] = advantages
         data.batch["returns"] = returns
@@ -216,26 +248,13 @@ def compute_advantage(
             rollout_is_weights = data.batch.get("rollout_is_weights", None)
             adv_kwargs["rollout_is_weights"] = rollout_is_weights
         # TMN_GRPO / QWENLONG_GRPO: pass reward_mode and difficulty params from config
-        if adv_estimator in (AdvantageEstimator.TMN_GRPO, "tmn_grpo", AdvantageEstimator.QWENLONG_GRPO, "qwenlong_grpo"):
-            if "reward_mode" in data.non_tensor_batch:
-                reward_mode = data.non_tensor_batch["reward_mode"]
-            elif "extra_info" in data.non_tensor_batch:
-                # reward_mode is nested inside extra_info; map to 9 aggregated types via TASK_METRIC_CONFIG
-                reward_mode = np.array(
-                    [TASK_METRIC_CONFIG.get(ei.get("reward_mode", ""), ei.get("reward_mode", ""))
-                     if isinstance(ei, dict) else ""
-                     for ei in data.non_tensor_batch["extra_info"]]
-                )
-                # promote to top-level so metric_utils.compute_reward_mode_metrics can use it
-                data.non_tensor_batch["reward_mode"] = reward_mode
-            else:
-                raise ValueError(
-                    "TMN_GRPO/QWENLONG_GRPO requires 'reward_mode'. It must be either a top-level field in "
-                    "non_tensor_batch or nested inside 'extra_info'. Please ensure your dataset provides it."
-                )
-            adv_kwargs["reward_mode"] = reward_mode
+        if adv_estimator in (
+            AdvantageEstimator.TMN_GRPO, "tmn_grpo", AdvantageEstimator.QWENLONG_GRPO, "qwenlong_grpo"
+        ):
+            adv_kwargs["reward_mode"] = _get_reward_mode(data)
             if config is not None:
                 adv_kwargs["difficulty_reweight"] = config.get("difficulty_reweight", False)
+                adv_kwargs["difficulty_gamma"] = config.get("difficulty_gamma", 1.0)
                 adv_kwargs["difficulty_smooth_alpha"] = config.get("difficulty_smooth_alpha", 0.5)
 
         # calculate advantage estimator
